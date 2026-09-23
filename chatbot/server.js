@@ -5,6 +5,7 @@ import { GoogleGenAI } from "@google/genai";
 const app = express();
 
 app.use(express.text());
+app.use(express.static("public"));
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
@@ -20,8 +21,17 @@ app.post("/chat", async (req, res) => {
     try {
         const userMessage = req.body;
 
+        if(!userMessage || userMessage.trim() === "") {
+            return res.status(400).send("Message cannot be empty");
+        }
+
+        if(userMessage.length > 500) {
+            return res.status(400).send("Message is too long. ");
+        }
+
         console.log("USER MESSAGE:", userMessage);
         console.log("TYPE:", typeof userMessage);
+        console.log("CONVERSATION HISTORY:", conversationHistory);
 
         conversationHistory.push({
             role: "user",
@@ -33,7 +43,7 @@ app.post("/chat", async (req, res) => {
             contents: conversationHistory,
             config: {
                 systemInstruction:
-                    "You are Tomato AI Support. Only answer questions related to Tomato food orders, delivery, payments, refunds, cancellations, and restaurant support."
+                    "You are Tomato AI Support. Only answer questions related to Tomato food orders, delivery, payments, refunds, cancellations, and restaurant support . Give ans in minimum words. "
             }
         });
 
@@ -48,6 +58,11 @@ app.post("/chat", async (req, res) => {
         console.error(error);
         res.status(500).send("Something went wrong");
     }
+});
+
+app.post("/reset", (req, res) => {
+    conversationHistory.length = 0; 
+    res.send("Conversation reset.");
 });
 
 app.listen(3000, () => {
