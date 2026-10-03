@@ -68,28 +68,78 @@ const tools = [
     }
 ]
 
-app.post('/chat', async (req, res) => {
+app.post("/chat", async (req, res) => {
     try {
-        const  message  = req.body;
+        const message = req.body;
+
+        // 1. Send user's message to Gemini
+        const contents = [
+            {
+                role: "user",
+                parts: [
+                    {
+                        text: message
+                    }
+                ]
+            }
+        ];
 
         const response = await ai.models.generateContent({
             model: "gemini-3.8-flash",
-            contents: message,
+            contents: contents,
             config: {
                 tools: tools
             }
         });
 
-        res.json({
-            response: response.text,
-            functionCalls: response.functionCalls
-        });
+        // 2. Check if Gemini wants to call a tool
+        const functionCall = response.functionCalls?.[0];
 
-        } catch (error) {
+        if (functionCall) {
+            const { a, b, operator } = functionCall.args;
+
+            // 3. Execute our JavaScript function
+            const result = calculator(a, b, operator);
+
+            // IMPORTANT:
+            // Add Gemini's complete original response.
+            // This preserves thoughtSignature.
+            contents.push(response.candidates[0].content);
+
+            // 4. Send tool result back to Gemini
+            contents.push({
+                role: "user",
+                parts: [
+                    {
+                        functionResponse: {
+                            name: functionCall.name,
+                            response: {
+                                result: result
+                            },
+                            id: functionCall.id
+                        }
+                    }
+                ]
+            });
+
+            // 5. Gemini generates final natural-language answer
+            const finalResponse = await ai.models.generateContent({
+                model: "gemini-3.8-flash",
+                contents: contents,
+                config: {
+                    tools: tools
+                }
+            });
+
+            return res.send(finalResponse.text);
+        }
+
+        // No tool needed
+        res.send(response.text);
+
+    } catch (error) {
         console.error(error);
-        res.status(500).json({ 
-            error: "Something went wrong"
-        });
+        res.status(500).send("Something went wrong");
     }
 });
 
