@@ -1,12 +1,12 @@
 import express from 'express';
 import "dotenv/config";
-import {GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const app = express();
 
 app.use(express.text());
 
-const ai= new GoogleGenAI({
+const ai = new GoogleGenAI({
     apiKey: process.env.GOOGLE_API_KEY,
 });
 
@@ -14,23 +14,34 @@ app.get('/', (req, res) => {
     res.send('Ai tool server is running');
 })
 
-function calculator(a, b, operator){
-    switch(operator){
+function calculator(a, b, operator) {
+    switch (operator) {
         case 'add':
             return a + b;
 
         case 'subtract':
-            return a - b ;
-            
+            return a - b;
+
         case 'multiply':
             return a * b;
-        
-        case 'divide':    
+
+        case 'divide':
             return a / b;
 
         default:
             return 'Invalid operator';
     }
+}
+
+function getWeather(city) {
+    const weatherData = {
+        Mumbai: "32°C, Sunny",
+        Delhi: "28°C, Clear",
+        Pune: "25°C, Cloudy",
+        Bangalore: "22°C, Rainy"
+    };
+
+    return weatherData[city] || "Weather data not available";
 }
 
 const tools = [
@@ -63,10 +74,25 @@ const tools = [
                     },
                     required: ["a", "b", "operator"]
                 }
+            },
+
+            {
+                name: "getWeather",
+                description: "Gets the current weather information for a city",
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        city: {
+                            type: Type.STRING,
+                            description: "Name of the city"
+                        }
+                    },
+                    required: ["city"]
+                }
             }
         ]
     }
-]
+];
 
 app.post("/chat", async (req, res) => {
     try {
@@ -96,14 +122,19 @@ app.post("/chat", async (req, res) => {
         const functionCall = response.functionCalls?.[0];
 
         if (functionCall) {
-            const { a, b, operator } = functionCall.args;
+            let result;
 
-            // 3. Execute our JavaScript function
-            const result = calculator(a, b, operator);
+            if (functionCall.name === "calculator") {
+                const { a, b, operator } = functionCall.args;
 
-            // IMPORTANT:
-            // Add Gemini's complete original response.
-            // This preserves thoughtSignature.
+                result = calculator(a, b, operator);
+            }
+
+            if (functionCall.name === "getWeather") {
+                const { city } = functionCall.args;
+
+                result = getWeather(city);
+            }
             contents.push(response.candidates[0].content);
 
             // 4. Send tool result back to Gemini
