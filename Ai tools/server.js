@@ -98,7 +98,6 @@ app.post("/chat", async (req, res) => {
     try {
         const message = req.body;
 
-        // 1. Send user's message to Gemini
         const contents = [
             {
                 role: "user",
@@ -110,6 +109,7 @@ app.post("/chat", async (req, res) => {
             }
         ];
 
+        // 1. Ask Gemini what to do
         const response = await ai.models.generateContent({
             model: "gemini-3.8-flash",
             contents: contents,
@@ -118,10 +118,22 @@ app.post("/chat", async (req, res) => {
             }
         });
 
-        // 2. Check if Gemini wants to call a tool
-        const functionCall = response.functionCalls?.[0];
+        // 2. Get all function calls
+        const functionCalls = response.functionCalls || [];
 
-        if (functionCall) {
+        // 3. No tool needed
+        if (functionCalls.length === 0) {
+            return res.send(response.text);
+        }
+
+        // 4. Keep Gemini's original response
+        contents.push(response.candidates[0].content);
+
+        // 5. Execute every tool call
+        const functionResponses = [];
+
+        for (const functionCall of functionCalls) {
+
             let result;
 
             if (functionCall.name === "calculator") {
@@ -130,43 +142,43 @@ app.post("/chat", async (req, res) => {
                 result = calculator(a, b, operator);
             }
 
-            if (functionCall.name === "getWeather") {
+            else if (functionCall.name === "getWeather") {
                 const { city } = functionCall.args;
 
                 result = getWeather(city);
             }
-            contents.push(response.candidates[0].content);
 
-            // 4. Send tool result back to Gemini
-            contents.push({
-                role: "user",
-                parts: [
-                    {
-                        functionResponse: {
-                            name: functionCall.name,
-                            response: {
-                                result: result
-                            },
-                            id: functionCall.id
-                        }
-                    }
-                ]
-            });
+            console.log("Tool:", functionCall.name);
+            console.log("Arguments:", functionCall.args);
+            console.log("Result:", result);
 
-            // 5. Gemini generates final natural-language answer
-            const finalResponse = await ai.models.generateContent({
-                model: "gemini-3.8-flash",
-                contents: contents,
-                config: {
-                    tools: tools
+            functionResponses.push({
+                functionResponse: {
+                    name: functionCall.name,
+                    response: {
+                        result: result
+                    },
+                    id: functionCall.id
                 }
             });
-
-            return res.send(finalResponse.text);
         }
 
-        // No tool needed
-        res.send(response.text);
+        // 6. Send ALL tool results back to Gemini
+        contents.push({
+            role: "user",
+            parts: functionResponses
+        });
+
+        // 7. Gemini creates final answer
+        const finalResponse = await ai.models.generateContent({
+            model: "gemini-3.8-flash",
+            contents: contents,
+            config: {
+                tools: tools
+            }
+        });
+
+        return res.send(finalResponse.text);
 
     } catch (error) {
         console.error(error);
