@@ -109,76 +109,91 @@ app.post("/chat", async (req, res) => {
             }
         ];
 
-        // 1. Ask Gemini what to do
-        const response = await ai.models.generateContent({
-            model: "gemini-3.8-flash",
-            contents: contents,
-            config: {
-                tools: tools
-            }
-        });
+        // Prevent an accidental infinite loop
+        let iterations = 0;
+        const MAX_ITERATIONS = 5;
 
-        // 2. Get all function calls
-        const functionCalls = response.functionCalls || [];
+        while (iterations < MAX_ITERATIONS) {
 
-        // 3. No tool needed
-        if (functionCalls.length === 0) {
-            return res.send(response.text);
-        }
+            iterations++;
 
-        // 4. Keep Gemini's original response
-        contents.push(response.candidates[0].content);
+            console.log(`\n--- Iteration ${iterations} ---`);
 
-        // 5. Execute every tool call
-        const functionResponses = [];
-
-        for (const functionCall of functionCalls) {
-
-            let result;
-
-            if (functionCall.name === "calculator") {
-                const { a, b, operator } = functionCall.args;
-
-                result = calculator(a, b, operator);
-            }
-
-            else if (functionCall.name === "getWeather") {
-                const { city } = functionCall.args;
-
-                result = getWeather(city);
-            }
-
-            console.log("Tool:", functionCall.name);
-            console.log("Arguments:", functionCall.args);
-            console.log("Result:", result);
-
-            functionResponses.push({
-                functionResponse: {
-                    name: functionCall.name,
-                    response: {
-                        result: result
-                    },
-                    id: functionCall.id
+            // Ask Gemini what to do
+            const response = await ai.models.generateContent({
+                model: "gemini-3.8-flash",
+                contents: contents,
+                config: {
+                    tools: tools
                 }
             });
+
+            // Get all tool calls from Gemini
+            const functionCalls = response.functionCalls || [];
+
+            // If Gemini does not need any tool,
+            // it is ready with the final answer
+            if (functionCalls.length === 0) {
+                return res.send(response.text);
+            }
+
+            // Keep Gemini's complete response
+            contents.push(response.candidates[0].content);
+
+            // Store results of all requested tools
+            const functionResponses = [];
+
+            // Execute every tool Gemini requested
+            for (const functionCall of functionCalls) {
+
+                let result;
+
+                console.log("Tool:", functionCall.name);
+                console.log("Arguments:", functionCall.args);
+
+                if (functionCall.name === "calculator") {
+
+                    const { a, b, operator } = functionCall.args;
+
+                    result = calculator(a, b, operator);
+                }
+
+                else if (functionCall.name === "getWeather") {
+
+                    const { city } = functionCall.args;
+
+                    result = getWeather(city);
+                }
+
+                else {
+                    result = `Unknown tool: ${functionCall.name}`;
+                }
+
+                console.log("Result:", result);
+
+                functionResponses.push({
+                    functionResponse: {
+                        name: functionCall.name,
+                        response: {
+                            result: result
+                        },
+                        id: functionCall.id
+                    }
+                });
+            }
+
+            // Send all tool results back to Gemini
+            contents.push({
+                role: "user",
+                parts: functionResponses
+            });
+
+            // Loop starts again
         }
 
-        // 6. Send ALL tool results back to Gemini
-        contents.push({
-            role: "user",
-            parts: functionResponses
-        });
-
-        // 7. Gemini creates final answer
-        const finalResponse = await ai.models.generateContent({
-            model: "gemini-3.8-flash",
-            contents: contents,
-            config: {
-                tools: tools
-            }
-        });
-
-        return res.send(finalResponse.text);
+        return res.status(500).send(
+            "Maximum tool-calling iterations reached"
+        );
 
     } catch (error) {
         console.error(error);
