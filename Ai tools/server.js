@@ -52,6 +52,14 @@ function getWeather(city) {
     return weatherData[city] || "Weather data not available";
 }
 
+import fs from 'fs';
+
+function saveNote(note) {
+    fs.appendFileSync('notes.txt', note + '\n');
+
+    return 'Note saved successfully';
+}
+
 const tools = [
     {
         functionDeclarations: [
@@ -97,7 +105,23 @@ const tools = [
                     },
                     required: ["city"]
                 }
+            },
+
+            {
+                name: "saveNote",
+                description: "Saves a note to a local notes file",
+                parameters: {
+                    type: Type.OBJECT,
+                    properties: {
+                        note: {
+                            type: Type.STRING,
+                            description: "The note that should be saved"
+                        }
+                    },
+                    required: ["note"]
+                }
             }
+
         ]
     }
 ];
@@ -172,6 +196,13 @@ app.post("/chat", async (req, res) => {
                     const { city } = functionCall.args;
 
                     result = getWeather(city);
+                }
+
+                else if (functionCall.name === "saveNote") {
+
+                    const { note } = functionCall.args;
+
+                    result = saveNote(note);
                 }
 
                 else {
