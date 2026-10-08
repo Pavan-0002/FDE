@@ -10,6 +10,14 @@ const ai = new GoogleGenAI({
     apiKey: process.env.GOOGLE_API_KEY,
 });
 
+const systemInstruction = `
+You are a helpful AI assistant.
+
+Use the available tools whenever they are needed to complete the user's request.
+After getting tool results, decide whether you need another tool.
+When you have enough information, give the user a clear final answer.
+`;
+
 app.get('/', (req, res) => {
     res.send('Ai tool server is running');
 })
@@ -124,7 +132,8 @@ app.post("/chat", async (req, res) => {
                 model: "gemini-3.8-flash",
                 contents: contents,
                 config: {
-                    tools: tools
+                    tools: tools,
+                    systemInstruction: systemInstruction
                 }
             });
 
