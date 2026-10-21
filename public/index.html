@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,43 +16,63 @@
     <div id="chat"></div>
 
     <script>
+
         async function sendMessage() {
-            const message = document.getElementById("message").value;
-
+            const messageInput = document.getElementById("message");
             const chat = document.getElementById("chat");
-            chat.innerHTML += `<p><b>Tomato Ai:</b> Typing...</p>`;
-            
-            const response = await fetch("/chat", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "text/plain"
-                },
-                body: message
-            });
-    
-            const data = await response.text();
+            const message = messageInput.value.trim();
 
-            chat.lastElementChild.innerHTML = `<b>Tomato AI:</b> ${data}`;
+            if (!message) return;
+
             chat.innerHTML += `<p><b>You:</b> ${message}</p>`;
-            chat.innerHTML += `<p><b>Tomato Ai:</b> ${data}</p>`;
-    
-            document.getElementById("message").value = "";
-        }
-    
-        async function resetChat() {
-            await fetch("/reset", {
-                method: "POST"
-            });
-            document.getElementById("chat").innerHTML = "";
-        }
-    
-        document.getElementById("message").addEventListener("keydown", function(event) {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                sendMessage();
+
+            const botMessage = document.createElement("p");
+            botMessage.innerHTML = "<b>Tomato AI:</b> ";
+            chat.appendChild(botMessage);
+
+            messageInput.value = "";
+
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: message
+                });
+
+                if (!response.ok) {
+                    throw new Error("Request failed: " + response.status);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    botMessage.appendChild(document.createTextNode(chunk));
+                }
+
+                const remainingText = decoder.decode();
+                if (remainingText) {
+                    botMessage.appendChild(
+                        document.createTextNode(remainingText)
+                    );
+                }
+
+            } catch (error) {
+                console.error(error);
+                botMessage.appendChild(
+                    document.createTextNode(" Sorry, something went wrong.")
+                );
             }
-        });
-    
+        }
+
     </script>
 </body>
+
 </html>
