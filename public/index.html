@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tomato Ai support</title>
+</head>
+
+<body>
+    <h1>Tomato Ai support</h1>
+    <input type="text" id="message" placeholder="Type your message here...">
+    <button onclick="sendMessage()">Send</button>
+    <button onclick="resetChat()">Clear Chat </button>
+
+    <div id="chat"></div>
+
+    <script>
+
+        async function sendMessage() {
+            const messageInput = document.getElementById("message");
+            const chat = document.getElementById("chat");
+            const message = messageInput.value.trim();
+
+            if (!message) return;
+
+            chat.innerHTML += `<p><b>You:</b> ${message}</p>`;
+
+            const botMessage = document.createElement("p");
+            botMessage.innerHTML = "<b>Tomato AI:</b> ";
+            chat.appendChild(botMessage);
+
+            messageInput.value = "";
+
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: message
+                });
+
+                if (!response.ok) {
+                    throw new Error("Request failed: " + response.status);
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    botMessage.appendChild(document.createTextNode(chunk));
+                }
+
+                const remainingText = decoder.decode();
+                if (remainingText) {
+                    botMessage.appendChild(
+                        document.createTextNode(remainingText)
+                    );
+                }
+
+            } catch (error) {
+                console.error(error);
+                botMessage.appendChild(
+                    document.createTextNode(" Sorry, something went wrong.")
+                );
+            }
+        }
+
+    </script>
+</body>
+
+</html>
