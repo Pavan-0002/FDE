@@ -1,3 +1,4 @@
+
 import express from "express";
 import "dotenv/config";
 import { GoogleGenAI } from "@google/genai";
@@ -11,58 +12,78 @@ const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
 });
 
-const conversationHistory = [];
+let conversationHistory = [];
 
 app.get("/", (req, res) => {
-    res.send("AI Chatbot Server is Running!");
+    res.sendFile("index.html", { root: "public" });
 });
 
+// Clear conversation history
+app.post("/clear", (req, res) => {
+    conversationHistory = [];
+    res.send("Chat cleared successfully");
+});
+
+// Chat with streaming
 app.post("/chat", async (req, res) => {
     try {
         const userMessage = req.body;
 
-        if(!userMessage || userMessage.trim() === "") {
+        if (!userMessage || userMessage.trim() === "") {
             return res.status(400).send("Message cannot be empty");
         }
 
-        if(userMessage.length > 500) {
-            return res.status(400).send("Message is too long. ");
+        if (userMessage.length > 500) {
+            return res.status(400).send("Message is too long.");
         }
 
         console.log("USER MESSAGE:", userMessage);
-        console.log("TYPE:", typeof userMessage);
-        console.log("CONVERSATION HISTORY:", conversationHistory);
 
         conversationHistory.push({
             role: "user",
             parts: [{ text: userMessage }]
         });
 
-        const response = await ai.models.generateContent({
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+        res.setHeader("Cache-Control", "no-cache, no-transform");
+        res.setHeader("X-Content-Type-Options", "nosniff");
+
+        const stream = await ai.models.generateContentStream({
             model: "gemini-3.8-flash",
             contents: conversationHistory,
             config: {
                 systemInstruction:
-                    "You are Tomato AI Support. Only answer questions related to Tomato food orders, delivery, payments, refunds, cancellations, and restaurant support . Give ans in minimum words. "
+                    "You are Tomato AI Support. Only answer questions related to Tomato food orders, delivery, payments, refunds, cancellations, and restaurant support. Give answers in minimum words."
             }
         });
 
+        let assistantReply = "";
+
+        for await (const chunk of stream) {
+            const text = chunk.text || "";
+
+            if (text) {
+                assistantReply += text;
+                res.write(text);
+            }
+        }
+
         conversationHistory.push({
             role: "model",
-            parts: [{ text: response.text }]
+            parts: [{ text: assistantReply }]
         });
 
-        res.send(response.text);
+        res.end();
 
     } catch (error) {
-        console.error(error);
-        res.status(500).send("Something went wrong");
-    }
-});
+        console.error("Chat error:", error);
 
-app.post("/reset", (req, res) => {
-    conversationHistory.length = 0; 
-    res.send("Conversation reset.");
+        if (!res.headersSent) {
+            res.status(500).send("Something went wrong");
+        } else {
+            res.end();
+        }
+    }
 });
 
 app.listen(3000, () => {

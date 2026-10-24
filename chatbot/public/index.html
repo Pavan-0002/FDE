@@ -1,57 +1,133 @@
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tomato Ai support</title>
+    <title>Tomato AI Support</title>
 </head>
 
 <body>
-    <h1>Tomato Ai support</h1>
-    <input type="text" id="message" placeholder="Type your message here...">
-    <button onclick="sendMessage()">Send</button>
-    <button onclick="resetChat()">Clear Chat </button>
+    <h1>Tomato AI Support</h1>
+
+    <input
+        type="text"
+        id="message"
+        placeholder="Type your message here..."
+    >
+
+    <button id="sendButton" onclick="sendMessage()">Send</button>
+    <button id="clearButton" onclick="resetChat()">Clear Chat</button>
 
     <div id="chat"></div>
 
     <script>
         async function sendMessage() {
-            const message = document.getElementById("message").value;
-
+            const messageInput = document.getElementById("message");
             const chat = document.getElementById("chat");
-            chat.innerHTML += `<p><b>Tomato Ai:</b> Typing...</p>`;
-            
-            const response = await fetch("/chat", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "text/plain"
-                },
-                body: message
-            });
-    
-            const data = await response.text();
+            const sendButton = document.getElementById("sendButton");
 
-            chat.lastElementChild.innerHTML = `<b>Tomato AI:</b> ${data}`;
-            chat.innerHTML += `<p><b>You:</b> ${message}</p>`;
-            chat.innerHTML += `<p><b>Tomato Ai:</b> ${data}</p>`;
-    
-            document.getElementById("message").value = "";
-        }
-    
-        async function resetChat() {
-            await fetch("/reset", {
-                method: "POST"
-            });
-            document.getElementById("chat").innerHTML = "";
-        }
-    
-        document.getElementById("message").addEventListener("keydown", function(event) {
-            if (event.key === "Enter") {
-                event.preventDefault();
-                sendMessage();
+            const message = messageInput.value.trim();
+
+            if (!message) return;
+
+            // Display user message once
+            const userMessage = document.createElement("p");
+            userMessage.textContent = "You: " + message;
+            chat.appendChild(userMessage);
+
+            // Create one bot message to update as chunks arrive
+            const botMessage = document.createElement("p");
+            botMessage.textContent = "Tomato AI: ";
+            chat.appendChild(botMessage);
+
+            messageInput.value = "";
+            sendButton.disabled = true;
+
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "text/plain"
+                    },
+                    body: message
+                });
+
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+
+                if (!response.body) {
+                    throw new Error("Streaming is not supported by this response.");
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, {
+                        stream: true
+                    });
+
+                    // Append chunks to the same message
+                    botMessage.textContent += chunk;
+                }
+
+                // Flush any remaining decoded characters
+                botMessage.textContent += decoder.decode();
+
+            } catch (error) {
+                console.error("Chat error:", error);
+                botMessage.textContent =
+                    "Tomato AI: Something went wrong. Please try again.";
+            } finally {
+                sendButton.disabled = false;
+                messageInput.focus();
             }
-        });
-    
+        }
+
+        async function resetChat() {
+            const chat = document.getElementById("chat");
+            const messageInput = document.getElementById("message");
+            const clearButton = document.getElementById("clearButton");
+
+            clearButton.disabled = true;
+
+            try {
+                const response = await fetch("/clear", {
+                    method: "POST"
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to clear conversation history");
+                }
+
+                chat.replaceChildren();
+                messageInput.value = "";
+
+            } catch (error) {
+                console.error("Clear error:", error);
+                alert("Could not clear chat. Please try again.");
+            } finally {
+                clearButton.disabled = false;
+            }
+        }
+
+        document.getElementById("message").addEventListener(
+            "keydown",
+            function (event) {
+                if (event.key === "Enter") {
+                    event.preventDefault();
+                    sendMessage();
+                }
+            }
+        );
     </script>
 </body>
+
 </html>
