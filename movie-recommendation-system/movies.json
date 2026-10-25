@@ -1,0 +1,27 @@
+
+[
+  {
+    "title": "Interstellar",
+    "description": "A team of astronauts travels through a wormhole to find a habitable planet and save humanity."
+  },
+  {
+    "title": "The Martian",
+    "description": "An astronaut stranded on Mars uses science and ingenuity to survive while waiting for rescue."
+  },
+  {
+    "title": "Gravity",
+    "description": "Two astronauts fight to survive after a space disaster leaves them stranded far from Earth."
+  },
+  {
+    "title": "Inception",
+    "description": "A skilled thief enters people's dreams to steal secrets and attempts to plant an idea in someone's mind."
+  },
+  {
+    "title": "Finding Nemo",
+    "description": "A clownfish crosses the ocean to find his missing son and faces dangerous challenges along the way."
+  },
+  {
+    "title": "The Pursuit of Happyness",
+    "description": "A struggling father overcomes financial hardship while pursuing a better future for his son."
+  }
+]
