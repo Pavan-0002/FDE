@@ -36,6 +36,11 @@ async function main() {
 
   console.log("\nSearch results:");
   console.log(JSON.stringify(results, null, 2));
+
+  const recommendations = await movieService.similarMovies("Interstellar");
+
+  console.log("\nSimilar movies:");
+  console.log(JSON.stringify(recommendations, null, 2));
 }
 
 main().catch(console.error);

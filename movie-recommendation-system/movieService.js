@@ -33,6 +33,41 @@ export class MovieService {
         );
     }
 
+    
+async similarMovies(title) {
+  const selectedMovie = this.moviesEmbedding.find(
+    (movie) => movie.title.toLowerCase() === title.toLowerCase()
+  );
+
+  if (!selectedMovie) {
+    throw new Error(`Movie not found: ${title}`);
+  }
+
+  const matches = [];
+
+  for (const movie of this.moviesEmbedding) {
+    if (movie.title.toLowerCase() === title.toLowerCase()) {
+      continue;
+    }
+
+    const similarity = this.cosineSimilarity(
+      selectedMovie.embedding,
+      movie.embedding
+    );
+
+    matches.push({
+      title: movie.title,
+      description: movie.description,
+      match: similarity,
+    });
+  }
+
+  matches.sort((a, b) => b.match - a.match);
+
+  return matches.slice(0, 3);
+}
+
+
     cosineSimilarity(a, b) {
         let dotProduct = 0;
         let normA = 0;
