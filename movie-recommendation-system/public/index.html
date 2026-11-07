@@ -5,6 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>AI Movie Recommendation System</title>
 
     <style>
@@ -21,7 +22,7 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: auto;
         }
 
@@ -72,22 +73,37 @@
             background: #0369a1;
         }
 
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .movie-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-            gap: 18px;
+            gap: 20px;
             margin-top: 25px;
         }
 
         .movie-card {
             background: #334155;
-            padding: 20px;
+            padding: 18px;
             border-radius: 12px;
             transition: transform 0.2s;
+            overflow: hidden;
         }
 
         .movie-card:hover {
             transform: translateY(-5px);
+        }
+
+        .movie-poster {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            background: #0f172a;
         }
 
         .movie-card h3 {
@@ -98,6 +114,11 @@
         .movie-card p {
             color: #cbd5e1;
             line-height: 1.5;
+        }
+
+        .movie-meta {
+            color: #94a3b8 !important;
+            font-size: 13px;
         }
 
         .similarity {
@@ -123,6 +144,10 @@
             body {
                 padding: 25px 15px;
             }
+
+            h1 {
+                font-size: 28px;
+            }
         }
     </style>
 </head>
@@ -131,15 +156,17 @@
 
     <div class="container">
 
-        <h1>AI Movie Recommendation System</h1>
+        <h1>🎬 AI Movie Recommendation System</h1>
 
         <p class="subtitle">
             Discover movies using AI-powered semantic search.
         </p>
 
         <!-- Semantic Search -->
+
         <section>
-            <h2>Search Movies</h2>
+
+            <h2>🔍 Search Movies</h2>
 
             <input
                 type="text"
@@ -150,32 +177,150 @@
             <button id="searchButton">Search</button>
 
             <div id="searchResults"></div>
+
         </section>
 
-        <!-- Similar Movies -->
+
+        <!-- Similar Movie Recommendations -->
+
         <section>
-            <h2>Find Similar Movies</h2>
+
+            <h2>🎯 Find Similar Movies</h2>
 
             <input
                 type="text"
                 id="movieInput"
-                placeholder="Enter a movie title"
+                placeholder="Enter a movie title, e.g. Interstellar"
             />
 
             <button id="similarButton">Find Similar</button>
 
             <div id="similarResults"></div>
+
         </section>
 
     </div>
 
+
     <script>
 
-        // SEMANTIC MOVIE SEARCH
+        // DOM ELEMENTS
 
         const searchInput = document.getElementById("searchInput");
         const searchButton = document.getElementById("searchButton");
         const searchResults = document.getElementById("searchResults");
+
+        const movieInput = document.getElementById("movieInput");
+        const similarButton = document.getElementById("similarButton");
+        const similarResults = document.getElementById("similarResults");
+
+
+        // FETCH MOVIE DETAILS FROM TMDB
+
+        async function getMovieDetails(title) {
+
+            try {
+
+                const response = await fetch(
+                    `/api/tmdb/${encodeURIComponent(title)}`
+                );
+
+                if (!response.ok) {
+                    return null;
+                }
+
+                return await response.json();
+
+            } catch (error) {
+
+                console.error("TMDB error:", error);
+
+                return null;
+            }
+        }
+
+
+        // CREATE MOVIE CARDS
+
+        async function displayMovies(movies, container) {
+
+            if (!movies || movies.length === 0) {
+                container.innerHTML = "<p>No movies found.</p>";
+                return;
+            }
+
+            container.innerHTML =
+                '<p class="status">Loading movie posters...</p>';
+
+            const movieCards = await Promise.all(
+
+                movies.map(async (movie) => {
+
+                    const details = await getMovieDetails(movie.title);
+
+                    const poster = details?.poster;
+
+                    const releaseYear = details?.releaseDate
+                        ? details.releaseDate.substring(0, 4)
+                        : "Year unavailable";
+
+                    const rating = details?.rating != null
+                        ? Number(details.rating).toFixed(1) + "/10"
+                        : "Not available";
+
+                    return `
+                        <div class="movie-card">
+
+                            ${
+                                poster
+                                    ? `<img
+                                        class="movie-poster"
+                                        src="${poster}"
+                                        alt="${movie.title} poster"
+                                        loading="lazy"
+                                    >`
+                                    : `<div class="movie-poster"
+                                        style="display:flex;align-items:center;justify-content:center;color:#94a3b8;">
+                                        Poster unavailable
+                                    </div>`
+                            }
+
+                            <h3>${movie.title}</h3>
+
+                            <p>${movie.description}</p>
+
+                            <p class="movie-meta">
+                                Release year: ${releaseYear}
+                            </p>
+
+                            <p class="movie-meta">
+                                TMDB Rating: ⭐ ${rating}
+                            </p>
+
+                            ${
+                                typeof movie.match === "number"
+                                    ? `<p class="similarity">
+                                        Similarity: ${(movie.match * 100).toFixed(2)}%
+                                    </p>`
+                                    : ""
+                            }
+
+                        </div>
+                    `;
+
+                })
+
+            );
+
+            container.innerHTML = `
+                <div class="movie-grid">
+                    ${movieCards.join("")}
+                </div>
+            `;
+        }
+
+
+        // SEMANTIC MOVIE SEARCH
 
         searchButton.addEventListener("click", async () => {
 
@@ -186,16 +331,23 @@
                 return;
             }
 
-            searchResults.innerHTML = '<p class="status">Searching movies...</p>';
+            searchButton.disabled = true;
+
+            searchResults.innerHTML =
+                '<p class="status">AI is searching for movies...</p>';
 
             try {
 
                 const response = await fetch("/api/movies/search", {
+
                     method: "POST",
+
                     headers: {
                         "Content-Type": "application/json"
                     },
+
                     body: JSON.stringify({ query })
+
                 });
 
                 if (!response.ok) {
@@ -204,24 +356,7 @@
 
                 const movies = await response.json();
 
-                if (movies.length === 0) {
-                    searchResults.innerHTML = "<p>No movies found.</p>";
-                    return;
-                }
-
-                searchResults.innerHTML = `
-                    <div class="movie-grid">
-                        ${movies.map(movie => `
-                            <div class="movie-card">
-                                <h3>${movie.title}</h3>
-                                <p>${movie.description}</p>
-                                <p class="similarity">
-                                    Similarity: ${(movie.match * 100).toFixed(2)}%
-                                </p>
-                            </div>
-                        `).join("")}
-                    </div>
-                `;
+                await displayMovies(movies, searchResults);
 
             } catch (error) {
 
@@ -229,16 +364,17 @@
                     "<p>Something went wrong. Please try again.</p>";
 
                 console.error(error);
+
+            } finally {
+
+                searchButton.disabled = false;
+
             }
 
         });
 
 
         // SIMILAR MOVIE RECOMMENDATIONS
-
-        const movieInput = document.getElementById("movieInput");
-        const similarButton = document.getElementById("similarButton");
-        const similarResults = document.getElementById("similarResults");
 
         similarButton.addEventListener("click", async () => {
 
@@ -248,6 +384,8 @@
                 alert("Please enter a movie title");
                 return;
             }
+
+            similarButton.disabled = true;
 
             similarResults.innerHTML =
                 '<p class="status">Finding similar movies...</p>';
@@ -264,32 +402,38 @@
 
                 const movies = await response.json();
 
-                if (movies.length === 0) {
-                    similarResults.innerHTML =
-                        "<p>No similar movies found.</p>";
-                    return;
-                }
-
-                similarResults.innerHTML = `
-                    <div class="movie-grid">
-                        ${movies.map(movie => `
-                            <div class="movie-card">
-                                <h3>${movie.title}</h3>
-                                <p>${movie.description}</p>
-                                <p class="similarity">
-                                    Similarity: ${(movie.match * 100).toFixed(2)}%
-                                </p>
-                            </div>
-                        `).join("")}
-                    </div>
-                `;
+                await displayMovies(movies, similarResults);
 
             } catch (error) {
 
                 similarResults.innerHTML =
-                    "<p>Unable to find similar movies.</p>";
+                    "<p>Unable to find similar movies. Check the movie title.</p>";
 
                 console.error(error);
+
+            } finally {
+
+                similarButton.disabled = false;
+
+            }
+
+        });
+
+
+        // ALLOW ENTER KEY TO SEARCH
+
+        searchInput.addEventListener("keydown", (event) => {
+
+            if (event.key === "Enter") {
+                searchButton.click();
+            }
+
+        });
+
+        movieInput.addEventListener("keydown", (event) => {
+
+            if (event.key === "Enter") {
+                similarButton.click();
             }
 
         });

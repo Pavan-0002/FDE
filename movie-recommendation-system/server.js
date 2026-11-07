@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { MovieService } from "./movieService.js";
+import { getMovieDetails } from "./tmdbService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -48,6 +49,29 @@ const movies = [
 
 app.get("/api/movies", (req, res) => {
   res.json(movies);
+});
+
+app.get("/api/tmdb/:title", async (req, res) => {
+    try {
+        const { title } = req.params;
+
+        const movie = await getMovieDetails(title);
+
+        if (!movie) {
+            return res.status(404).json({
+                error: "Movie not found on TMDB"
+            });
+        }
+
+        res.json(movie);
+
+    } catch (error) {
+        console.error("TMDB route error:", error);
+
+        res.status(500).json({
+            error: "Failed to fetch movie details"
+        });
+    }
 });
 
 app.get("/api/movies/:title/similar", async (req, res) => {
