@@ -1,0 +1,300 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Movie Recommendation System</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 40px 20px;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 36px;
+            color: #38bdf8;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 40px;
+        }
+
+        section {
+            background: #1e293b;
+            padding: 25px;
+            border-radius: 14px;
+            margin-bottom: 30px;
+        }
+
+        input {
+            width: 75%;
+            padding: 13px;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            background: #0f172a;
+            color: white;
+            font-size: 15px;
+        }
+
+        input:focus {
+            outline: 2px solid #38bdf8;
+        }
+
+        button {
+            padding: 13px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #0284c7;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0369a1;
+        }
+
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 18px;
+            margin-top: 25px;
+        }
+
+        .movie-card {
+            background: #334155;
+            padding: 20px;
+            border-radius: 12px;
+            transition: transform 0.2s;
+        }
+
+        .movie-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .movie-card h3 {
+            color: #38bdf8;
+            margin-top: 0;
+        }
+
+        .movie-card p {
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        .similarity {
+            color: #4ade80 !important;
+            font-weight: bold;
+        }
+
+        .status {
+            color: #94a3b8;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 600px) {
+            input {
+                width: 100%;
+                margin-bottom: 12px;
+            }
+
+            button {
+                width: 100%;
+            }
+
+            body {
+                padding: 25px 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>AI Movie Recommendation System</h1>
+
+        <p class="subtitle">
+            Discover movies using AI-powered semantic search.
+        </p>
+
+        <!-- Semantic Search -->
+        <section>
+            <h2>Search Movies</h2>
+
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Example: I want a space survival movie"
+            />
+
+            <button id="searchButton">Search</button>
+
+            <div id="searchResults"></div>
+        </section>
+
+        <!-- Similar Movies -->
+        <section>
+            <h2>Find Similar Movies</h2>
+
+            <input
+                type="text"
+                id="movieInput"
+                placeholder="Enter a movie title"
+            />
+
+            <button id="similarButton">Find Similar</button>
+
+            <div id="similarResults"></div>
+        </section>
+
+    </div>
+
+    <script>
+
+        // SEMANTIC MOVIE SEARCH
+
+        const searchInput = document.getElementById("searchInput");
+        const searchButton = document.getElementById("searchButton");
+        const searchResults = document.getElementById("searchResults");
+
+        searchButton.addEventListener("click", async () => {
+
+            const query = searchInput.value.trim();
+
+            if (!query) {
+                alert("Please enter a search query");
+                return;
+            }
+
+            searchResults.innerHTML = '<p class="status">Searching movies...</p>';
+
+            try {
+
+                const response = await fetch("/api/movies/search", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ query })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to search movies");
+                }
+
+                const movies = await response.json();
+
+                if (movies.length === 0) {
+                    searchResults.innerHTML = "<p>No movies found.</p>";
+                    return;
+                }
+
+                searchResults.innerHTML = `
+                    <div class="movie-grid">
+                        ${movies.map(movie => `
+                            <div class="movie-card">
+                                <h3>${movie.title}</h3>
+                                <p>${movie.description}</p>
+                                <p class="similarity">
+                                    Similarity: ${(movie.match * 100).toFixed(2)}%
+                                </p>
+                            </div>
+                        `).join("")}
+                    </div>
+                `;
+
+            } catch (error) {
+
+                searchResults.innerHTML =
+                    "<p>Something went wrong. Please try again.</p>";
+
+                console.error(error);
+            }
+
+        });
+
+
+        // SIMILAR MOVIE RECOMMENDATIONS
+
+        const movieInput = document.getElementById("movieInput");
+        const similarButton = document.getElementById("similarButton");
+        const similarResults = document.getElementById("similarResults");
+
+        similarButton.addEventListener("click", async () => {
+
+            const title = movieInput.value.trim();
+
+            if (!title) {
+                alert("Please enter a movie title");
+                return;
+            }
+
+            similarResults.innerHTML =
+                '<p class="status">Finding similar movies...</p>';
+
+            try {
+
+                const response = await fetch(
+                    `/api/movies/${encodeURIComponent(title)}/similar`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Movie not found or request failed");
+                }
+
+                const movies = await response.json();
+
+                if (movies.length === 0) {
+                    similarResults.innerHTML =
+                        "<p>No similar movies found.</p>";
+                    return;
+                }
+
+                similarResults.innerHTML = `
+                    <div class="movie-grid">
+                        ${movies.map(movie => `
+                            <div class="movie-card">
+                                <h3>${movie.title}</h3>
+                                <p>${movie.description}</p>
+                                <p class="similarity">
+                                    Similarity: ${(movie.match * 100).toFixed(2)}%
+                                </p>
+                            </div>
+                        `).join("")}
+                    </div>
+                `;
+
+            } catch (error) {
+
+                similarResults.innerHTML =
+                    "<p>Unable to find similar movies.</p>";
+
+                console.error(error);
+            }
+
+        });
+
+    </script>
+
+</body>
+</html>
