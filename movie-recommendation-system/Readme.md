@@ -131,18 +131,20 @@ Content-Type: application/json
 
 The API returns movies ranked by semantic similarity.
 
-## 📐 Core Concept: Cosine Similarity
+## 📐 Cosine Similarity
 
-Cosine Similarity measures the similarity between two vectors by calculating the cosine of the angle between them.
+Cosine Similarity measures the similarity between two vectors.
 
-\[
-\text{Similarity}(A,B)=
-\frac{A\cdot B}{\|A\|\|B\|}
-\]
+**Formula:**
 
-A higher score indicates greater directional similarity between the vectors.
+`Cosine Similarity = (A · B) / (|A| × |B|)`
 
-This allows the system to identify movies with related themes and meanings, even when their descriptions use different words.
+Where:
+- `A · B` = Dot product of two vectors.
+- `|A|` = Magnitude of vector A.
+- `|B|` = Magnitude of vector B.
+
+A higher similarity score indicates greater similarity between two vectors.
 
 ## 🎯 Learning Outcomes
 
